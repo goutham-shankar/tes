@@ -100,3 +100,34 @@ export function clusterInsights<T extends { id: string; embedding: number[] }>(
 
   return clusters;
 }
+
+/**
+ * Tag-based clustering fallback when embeddings are unavailable.
+ * Two items join the same cluster if they share at least `minShared` tags.
+ */
+export function clusterByTags<T extends { id: string; tags: string[] }>(
+  items: T[],
+  minShared = 1
+): T[][] {
+  const clusters: T[][] = [];
+
+  for (const item of items) {
+    if (!item.tags || item.tags.length === 0) {
+      clusters.push([item]);
+      continue;
+    }
+    let placed = false;
+    for (const cluster of clusters) {
+      const rep = cluster[0];
+      const shared = item.tags.filter((t) => rep.tags.includes(t)).length;
+      if (shared >= minShared) {
+        cluster.push(item);
+        placed = true;
+        break;
+      }
+    }
+    if (!placed) clusters.push([item]);
+  }
+
+  return clusters;
+}

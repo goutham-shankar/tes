@@ -4,7 +4,7 @@ import { Search, Inbox, Layers } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { InsightCard } from "./InsightCard";
 import { type Insight } from "@/db/schema";
-import { clusterInsights } from "@/lib/vector";
+import { clusterInsights, clusterByTags } from "@/lib/vector";
 import { cn } from "@/lib/utils";
 
 interface InsightFeedProps {
@@ -25,8 +25,14 @@ export function InsightFeed({ insights, onDelete, filterTag }: InsightFeedProps)
     return matchesTag && matchesQuery;
   });
 
-  // Group semantically related insights together
-  const clusters = useMemo(() => clusterInsights(filtered, 0.72), [filtered]);
+  // Group semantically related insights — use embedding clusters if available,
+  // fall back to tag-based clustering when embeddings are empty
+  const clusters = useMemo(() => {
+    const hasEmbeddings = filtered.some((i) => i.embedding && i.embedding.length > 0);
+    return hasEmbeddings
+      ? clusterInsights(filtered, 0.72)
+      : clusterByTags(filtered, 1);
+  }, [filtered]);
 
   return (
     <div className="space-y-4">
