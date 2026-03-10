@@ -1,0 +1,33 @@
+{
+  "name": "InsightVault",
+  "short_name": "InsightVault",
+  "description": "AI-powered personal knowledge journal",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0d1117",
+  "theme_color": "#0d1117",
+  "orientation": "portrait-primary",
+  "categories": ["productivity", "utilities"],
+  "icons": [
+    {
+      "src": "/icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Add Insight",
+      "short_name": "Add",
+      "description": "Quickly capture a new insight",
+      "url": "/?action=new"
+    },
+    {
+      "name": "Ask AI",
+      "short_name": "Ask",
+      "description": "Ask a question about your notes",
+      "url": "/ask"
+    }
+  ]
+}
