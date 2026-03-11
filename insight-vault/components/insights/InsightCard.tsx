@@ -39,6 +39,7 @@ export function InsightCard({ insight, onDelete }: InsightCardProps) {
             <Button
               variant="ghost"
               size="icon"
+              aria-label={`Delete insight: ${insight.content.slice(0, 30)}`}
               className="h-7 w-7 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
               onClick={() => onDelete(insight.id)}
             >

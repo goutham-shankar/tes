@@ -38,6 +38,7 @@ function ConversationItem({
   return (
     <button
       onClick={onSelect}
+      aria-label={`Open conversation: ${conv.title}`}
       className={cn(
         "group w-full flex items-center gap-2 px-3 py-2.5 rounded-lg text-left text-sm transition-colors",
         active
@@ -45,10 +46,11 @@ function ConversationItem({
           : "text-muted-foreground hover:bg-accent hover:text-foreground"
       )}
     >
-      <MessageSquare className="w-3.5 h-3.5 shrink-0 opacity-60" />
+      <MessageSquare className="w-3.5 h-3.5 shrink-0 opacity-60" aria-hidden="true" />
       <span className="flex-1 truncate min-w-0">{conv.title}</span>
-      <span
-        role="button"
+      <button
+        type="button"
+        aria-label={`Delete conversation: ${conv.title}`}
         onClick={(e) => {
           e.stopPropagation();
           onDelete();
@@ -56,7 +58,7 @@ function ConversationItem({
         className="opacity-0 group-hover:opacity-60 hover:!opacity-100 transition-opacity p-0.5 rounded"
       >
         <Trash2 className="w-3 h-3" />
-      </span>
+      </button>
     </button>
   );
 }
@@ -75,7 +77,7 @@ function MessageBubble({
   return (
     <div className={cn("flex gap-3 w-full", isUser ? "justify-end" : "justify-start")}>
       {!isUser && (
-        <div className="flex-shrink-0 mt-0.5 w-7 h-7 rounded-full bg-primary/15 text-primary flex items-center justify-center">
+        <div className="flex-shrink-0 mt-0.5 w-7 h-7 rounded-full bg-primary/15 text-primary flex items-center justify-center" aria-hidden="true">
           <Bot className="w-3.5 h-3.5" />
         </div>
       )}
@@ -147,6 +149,7 @@ function MessageBubble({
                     msg.saveSuggestion!.tags
                   )
                 }
+                aria-label="Save suggestion to vault"
                 className="flex items-center gap-1.5 text-primary hover:underline font-medium"
               >
                 <BookMarked className="w-3.5 h-3.5" />
@@ -158,7 +161,7 @@ function MessageBubble({
       </div>
 
       {isUser && (
-        <div className="flex-shrink-0 mt-0.5 w-7 h-7 rounded-full bg-accent text-muted-foreground flex items-center justify-center">
+        <div className="flex-shrink-0 mt-0.5 w-7 h-7 rounded-full bg-accent text-muted-foreground flex items-center justify-center" aria-hidden="true">
           <User className="w-3.5 h-3.5" />
         </div>
       )}
@@ -168,15 +171,15 @@ function MessageBubble({
 
 function StreamingBubble({ text }: { text: string }) {
   return (
-    <div className="flex gap-3 justify-start">
-      <div className="flex-shrink-0 mt-0.5 w-7 h-7 rounded-full bg-primary/15 text-primary flex items-center justify-center">
+    <div className="flex gap-3 justify-start" role="status" aria-live="polite">
+      <div className="flex-shrink-0 mt-0.5 w-7 h-7 rounded-full bg-primary/15 text-primary flex items-center justify-center" aria-hidden="true">
         <Bot className="w-3.5 h-3.5" />
       </div>
       <div className="bg-card border border-border rounded-2xl rounded-tl-sm px-4 py-3 text-sm leading-relaxed max-w-[80%]">
         {text ? (
           <>
             <p className="whitespace-pre-wrap">{text}</p>
-            <span className="inline-block w-1.5 h-4 bg-primary/60 rounded-sm animate-pulse ml-0.5 align-middle" />
+            <span className="inline-block w-1.5 h-4 bg-primary/60 rounded-sm animate-pulse ml-0.5 align-middle" aria-hidden="true" />
           </>
         ) : (
           <span className="flex items-center gap-2 text-muted-foreground">
@@ -262,10 +265,11 @@ export function GptChat({
   return (
     <div className="flex h-full overflow-hidden">
       {/* ── Sidebar ── */}
-      <aside className="w-56 shrink-0 border-r border-border flex flex-col bg-card/50">
+      <aside className="w-56 shrink-0 border-r border-border flex flex-col bg-card/50" aria-label="Conversations">
         <div className="p-3 border-b border-border">
           <button
             onClick={onNew}
+            aria-label="Start new conversation"
             className="w-full flex items-center gap-2 px-3 py-2.5 rounded-lg border border-border text-sm font-medium text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
           >
             <Plus className="w-4 h-4" />
@@ -306,7 +310,7 @@ export function GptChat({
                   InsightVault AI
                 </h2>
                 <p className="text-muted-foreground text-sm max-w-sm">
-                  Your personal AI that knows everything you've saved.
+                  Your personal AI that knows everything you&apos;ve saved.
                   Ask anything — get ideas, find patterns, or just think out loud.
                 </p>
               </div>
@@ -324,7 +328,7 @@ export function GptChat({
                     className="flex items-center gap-2 text-left px-4 py-3 rounded-xl border border-border bg-card hover:border-primary/30 hover:bg-primary/5 transition-all text-sm text-muted-foreground hover:text-foreground disabled:opacity-40 disabled:cursor-not-allowed group"
                   >
                     <span className="flex-1 leading-snug">{p}</span>
-                    <ChevronRight className="w-3.5 h-3.5 shrink-0 opacity-0 group-hover:opacity-60 transition-opacity" />
+                    <ChevronRight className="w-3.5 h-3.5 shrink-0 opacity-0 group-hover:opacity-60 transition-opacity" aria-hidden="true" />
                   </button>
                 ))}
               </div>
@@ -346,7 +350,7 @@ export function GptChat({
               ))}
               {streaming && <StreamingBubble text={streamBuffer} />}
               {error && (
-                <p className="text-xs text-destructive text-center">{error}</p>
+                <p className="text-xs text-destructive text-center" role="alert">{error}</p>
               )}
               <div ref={bottomRef} />
             </div>
@@ -369,11 +373,13 @@ export function GptChat({
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={handleKey}
                 disabled={!aiReady || streaming}
+                aria-label="Chat message input"
                 className="flex-1 bg-transparent resize-none outline-none text-sm placeholder:text-muted-foreground leading-relaxed disabled:opacity-40 min-h-[24px]"
               />
               <button
                 onClick={handleSend}
                 disabled={!aiReady || streaming || !input.trim()}
+                aria-label="Send message"
                 className="flex-shrink-0 w-8 h-8 rounded-lg bg-primary text-primary-foreground flex items-center justify-center hover:bg-primary/90 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
               >
                 {streaming ? (

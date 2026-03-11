@@ -32,16 +32,25 @@ export function ApiKeySettings({
       await onSave(key.trim());
       setKey("");
       toast("API key saved and encrypted locally.", "success");
-    } catch {
-      toast("Failed to save API key. Please try again.", "error");
+    } catch (err) {
+      console.error("[InsightVault] API key save error:", err);
+      toast(
+        err instanceof Error ? err.message : "Failed to save API key. Please try again.",
+        "error"
+      );
     } finally {
       setSaving(false);
     }
   }
 
   async function handleClear() {
-    await onClear();
-    toast("API key removed.", "info");
+    try {
+      await onClear();
+      toast("API key removed.", "info");
+    } catch (err) {
+      console.error("[InsightVault] API key clear error:", err);
+      toast("Failed to remove API key.", "error");
+    }
   }
 
   return (
@@ -63,6 +72,7 @@ export function ApiKeySettings({
             <Button
               variant="ghost"
               size="icon"
+              aria-label="Remove API key"
               className="h-7 w-7 text-muted-foreground hover:text-destructive"
               onClick={handleClear}
             >
@@ -91,6 +101,7 @@ export function ApiKeySettings({
             <button
               type="button"
               onClick={() => setShow((s) => !s)}
+              aria-label={show ? "Hide API key" : "Show API key"}
               className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
             >
               {show ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
@@ -113,8 +124,8 @@ export function ApiKeySettings({
           <p className="text-xs font-medium text-muted-foreground">Security notes</p>
           <ul className="text-xs text-muted-foreground space-y-1 list-disc list-inside">
             <li>Your key is encrypted with AES-GCM using the Web Crypto API.</li>
-            <li>The key is stored only in your browser's IndexedDB — never sent to any server.</li>
-            <li>AI requests go directly from your browser to Google's Gemini API.</li>
+            <li>The key is stored only in your browser&apos;s IndexedDB — never sent to any server.</li>
+            <li>AI requests go directly from your browser to Google&apos;s Gemini API.</li>
           </ul>
         </div>
 
