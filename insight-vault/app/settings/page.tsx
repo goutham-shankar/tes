@@ -1,5 +1,6 @@
 "use client";
-import { Settings, Database, Trash2 } from "lucide-react";
+import { useState } from "react";
+import { Settings, Database, Trash2, Upload, Download } from "lucide-react";
 import { AppShell } from "@/components/layout/AppShell";
 import { ApiKeySettings } from "@/components/settings/ApiKeySettings";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -8,6 +9,7 @@ import { useApiKey } from "@/hooks/useApiKey";
 import { useInsights } from "@/hooks/useInsights";
 import { useToast } from "@/components/ui/toast";
 import { db } from "@/db/schema";
+import { importInsights } from "@/db/operations";
 
 function DataManagement({
   insightCount,
@@ -15,6 +17,7 @@ function DataManagement({
   insightCount: number;
 }) {
   const { toast } = useToast();
+  const [importing, setImporting] = useState(false);
 
   async function handleClearAll() {
     if (
@@ -25,6 +28,7 @@ function DataManagement({
       return;
     await db.insights.clear();
     await db.chatMessages.clear();
+    await db.conversations.clear();
     toast("All data cleared.", "info");
   }
 
@@ -42,6 +46,36 @@ function DataManagement({
     toast(`Exported ${insights.length} insights.`, "success");
   }
 
+  async function handleImport() {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = ".json";
+    input.onchange = async (e) => {
+      const file = (e.target as HTMLInputElement).files?.[0];
+      if (!file) return;
+
+      setImporting(true);
+      try {
+        const text = await file.text();
+        const data = JSON.parse(text);
+
+        if (!Array.isArray(data)) {
+          toast("Invalid file format. Expected a JSON array of insights.", "error");
+          return;
+        }
+
+        const count = await importInsights(data);
+        toast(`Imported ${count} insight${count !== 1 ? "s" : ""} successfully.`, "success");
+      } catch (err) {
+        console.error("[InsightVault] Import error:", err);
+        toast("Failed to import. Please check the file format.", "error");
+      } finally {
+        setImporting(false);
+      }
+    };
+    input.click();
+  }
+
   return (
     <Card>
       <CardHeader>
@@ -56,9 +90,22 @@ function DataManagement({
             <p className="text-sm font-medium">Total Insights</p>
             <p className="text-2xl font-bold text-primary">{insightCount}</p>
           </div>
-          <Button variant="outline" size="sm" onClick={handleExport}>
-            Export JSON
-          </Button>
+          <div className="flex gap-2">
+            <Button variant="outline" size="sm" onClick={handleExport} className="gap-1.5">
+              <Download className="w-3.5 h-3.5" />
+              Export
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleImport}
+              disabled={importing}
+              className="gap-1.5"
+            >
+              <Upload className="w-3.5 h-3.5" />
+              {importing ? "Importing…" : "Import"}
+            </Button>
+          </div>
         </div>
         <Button
           variant="outline"
@@ -100,7 +147,7 @@ export default function SettingsPage() {
           <CardContent className="pt-5 space-y-2">
             <p className="text-xs text-muted-foreground">
               <span className="font-semibold text-foreground">InsightVault</span>{" "}
-              v0.1.0 — AI-powered personal knowledge journal.
+              v0.2.0 — AI-powered personal knowledge journal.
             </p>
             <p className="text-xs text-muted-foreground">
               Built with Next.js · Dexie.js · Google Gemini · Tailwind CSS.

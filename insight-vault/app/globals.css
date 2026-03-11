@@ -3,7 +3,9 @@
 @tailwind utilities;
 
 @layer base {
-  :root {
+  /* ── Dark theme (default) ───────────────────────────────────── */
+  :root,
+  .dark {
     --background: 222 47% 8%;
     --foreground: 213 31% 91%;
     --card: 222 47% 11%;
@@ -23,6 +25,30 @@
     --border: 222 47% 18%;
     --input: 222 47% 16%;
     --ring: 230 80% 65%;
+    --radius: 0.75rem;
+  }
+
+  /* ── Light theme ────────────────────────────────────────────── */
+  .light {
+    --background: 0 0% 100%;
+    --foreground: 222 47% 11%;
+    --card: 0 0% 98%;
+    --card-foreground: 222 47% 11%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222 47% 11%;
+    --primary: 230 80% 55%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 220 14% 96%;
+    --secondary-foreground: 222 47% 11%;
+    --muted: 220 14% 96%;
+    --muted-foreground: 215 16% 47%;
+    --accent: 220 14% 93%;
+    --accent-foreground: 222 47% 11%;
+    --destructive: 0 62% 50%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 220 13% 91%;
+    --input: 220 13% 91%;
+    --ring: 230 80% 55%;
     --radius: 0.75rem;
   }
 }
@@ -63,4 +89,14 @@
   border-radius: calc(var(--radius) + 1px);
   background: linear-gradient(135deg, hsl(230 80% 65% / 0.3), transparent 60%);
   pointer-events: none;
+}
+
+/* Fade-in animation */
+@keyframes fade-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-fade-in {
+  animation: fade-in 0.3s ease-out;
 }

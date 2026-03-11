@@ -9,7 +9,7 @@ import { useConversation } from "@/hooks/useConversation";
 import { Layers } from "lucide-react";
 
 export default function HomePage() {
-  const { insights, saving, addNew, remove } = useInsights();
+  const { insights, saving, addNew, edit, remove, toggleFav } = useInsights();
   const { ready } = useApiKey();
   const {
     messages,
@@ -21,14 +21,10 @@ export default function HomePage() {
     activeConvId,
   } = useConversation();
 
-  // Ensure there's always an active conversation for the sidebar panel
   async function handleAsk(question: string) {
     if (!activeConvId) await newConversation();
     await send(question);
   }
-
-  // Pass messages directly — ChatPanel only uses role/id/content
-  const flatMessages = messages;
 
   return (
     <AppShell>
@@ -51,14 +47,19 @@ export default function HomePage() {
 
           {/* Feed */}
           <div className="flex-1 overflow-y-auto px-6 py-5">
-            <InsightFeed insights={insights} onDelete={remove} />
+            <InsightFeed
+              insights={insights}
+              onDelete={remove}
+              onEdit={edit}
+              onToggleFavorite={toggleFav}
+            />
           </div>
         </div>
 
         {/* Right panel — AI chat */}
         <aside className="hidden lg:flex flex-col w-80 xl:w-96 shrink-0 border-l border-border">
           <ChatPanel
-            messages={flatMessages}
+            messages={messages}
             streaming={streaming}
             streamBuffer={streamBuffer}
             error={error}

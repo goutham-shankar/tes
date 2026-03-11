@@ -40,11 +40,26 @@ export async function getInsightById(id: string): Promise<Insight | undefined> {
   return db.insights.get(id);
 }
 
+export async function updateInsight(
+  id: string,
+  updates: Partial<Pick<Insight, "content" | "type" | "tags" | "source">>
+): Promise<void> {
+  await db.insights.update(id, { ...updates, updatedAt: new Date() });
+}
+
 export async function updateInsightTags(
   id: string,
   tags: string[]
 ): Promise<void> {
   await db.insights.update(id, { tags, updatedAt: new Date() });
+}
+
+export async function toggleFavorite(id: string): Promise<boolean> {
+  const insight = await db.insights.get(id);
+  if (!insight) throw new Error("Insight not found");
+  const newVal = !insight.favorite;
+  await db.insights.update(id, { favorite: newVal, updatedAt: new Date() });
+  return newVal;
 }
 
 export async function deleteInsight(id: string): Promise<void> {
@@ -99,6 +114,66 @@ export async function getAllTags(): Promise<string[]> {
     }
   }
   return Array.from(tagSet).sort();
+}
+
+/** Import insights from a JSON export */
+export async function importInsights(
+  data: Partial<Insight>[]
+): Promise<number> {
+  let imported = 0;
+  for (const item of data) {
+    if (!item.content || !item.type) continue;
+    const now = new Date();
+    const insight: Insight = {
+      id: item.id || crypto.randomUUID(),
+      content: item.content,
+      type: item.type,
+      tags: item.tags || [],
+      embedding: item.embedding || [],
+      source: item.source,
+      threads: item.threads,
+      favorite: item.favorite,
+      createdAt: item.createdAt ? new Date(item.createdAt) : now,
+      updatedAt: now,
+    };
+    try {
+      await db.insights.add(insight);
+      imported++;
+    } catch {
+      // Duplicate ID — skip
+      try {
+        insight.id = crypto.randomUUID();
+        await db.insights.add(insight);
+        imported++;
+      } catch {
+        // skip entirely
+      }
+    }
+  }
+  return imported;
+}
+
+// ─── Theme ──────────────────────────────────────────────────────────────────
+
+export async function getTheme(): Promise<"dark" | "light"> {
+  const settings = await db.appSettings.get(1);
+  return settings?.theme || "dark";
+}
+
+export async function setTheme(theme: "dark" | "light"): Promise<void> {
+  const existing = await db.appSettings.get(1);
+  if (existing) {
+    await db.appSettings.update(1, { theme, updatedAt: new Date() });
+  } else {
+    await db.appSettings.add({
+      id: 1,
+      geminiKeyHash: null,
+      geminiKeyIv: null,
+      theme,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+  }
 }
 
 // ─── Conversations ─────────────────────────────────────────────────────────────
