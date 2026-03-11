@@ -59,22 +59,25 @@ IMPORTANT RULES:
 async function buildNotesContext(query: string): Promise<string> {
   try {
     const queryEmbedding = await generateEmbedding(query, true);
-    const allDocs = await getAllInsightsWithEmbeddings();
-    if (allDocs.length > 0) {
-      const top = topKSearch(queryEmbedding, allDocs, 10, 0.2);
-      if (top.length > 0) {
-        return top
-          .map(
-            (r, i) =>
-              `[${i + 1}] tags: ${r.tags.join(", ") || "untagged"}\n"${r.content}"`
-          )
-          .join("\n\n");
+    if (queryEmbedding.length > 0) {
+      const allDocs = await getAllInsightsWithEmbeddings();
+      if (allDocs.length > 0) {
+        const top = topKSearch(queryEmbedding, allDocs, 10, 0.2);
+        if (top.length > 0) {
+          return top
+            .map(
+              (r, i) =>
+                `[${i + 1}] tags: ${r.tags.join(", ") || "untagged"}\n"${r.content}"`
+            )
+            .join("\n\n");
+        }
       }
     }
-  } catch {
-    // fallback to recency-based load
+  } catch (err) {
+    console.warn("[InsightVault] Semantic context build failed, using recency fallback:", err);
   }
 
+  // Fallback to recency-based load
   const all = await getAllInsights();
   return all
     .slice(0, 15)
@@ -128,15 +131,23 @@ Assistant:`;
 
   const client = getGeminiClient();
   const model = client.getGenerativeModel({ model: GEMINI_TEXT_MODEL });
-  const stream = await model.generateContentStream(fullPrompt);
 
   let full = "";
-  for await (const chunk of stream.stream) {
-    const text = chunk.text();
-    if (text) {
-      full += text;
-      yield text;
+  try {
+    const stream = await model.generateContentStream(fullPrompt);
+    for await (const chunk of stream.stream) {
+      const text = chunk.text();
+      if (text) {
+        full += text;
+        yield text;
+      }
     }
+  } catch (err) {
+    console.error("[InsightVault] Stream error:", err);
+    if (!full) {
+      throw err;
+    }
+    // If we already have partial content, return what we got
   }
 
   return full;
@@ -160,5 +171,7 @@ Assistant: ${firstAssistantReply.slice(0, 200)}
 Title:`;
 
   const result = await model.generateContent(prompt);
-  return result.response.text().trim().slice(0, 60);
+  const title = result.response.text().trim().slice(0, 60);
+  // Sanitize: remove any non-printable characters or excessive whitespace
+  return title.replace(/[^\x20-\x7E\u00A0-\uFFFF]/g, "").trim();
 }

@@ -4,9 +4,18 @@
  */
 import { db } from "@/db/schema";
 import { encryptApiKey, decryptApiKey } from "@/lib/crypto";
-import { initGemini} from "@/services/ai/gemini";
+import { initGemini } from "@/services/ai/gemini";
+
+/** Basic format validation for Gemini API keys */
+function isValidGeminiKeyFormat(key: string): boolean {
+  return typeof key === "string" && key.trim().length >= 10;
+}
 
 export async function saveApiKey(plainKey: string): Promise<void> {
+  if (!isValidGeminiKeyFormat(plainKey)) {
+    throw new Error("Invalid API key format. Please enter a valid Gemini API key.");
+  }
+
   const { encrypted, iv } = await encryptApiKey(plainKey);
   const now = new Date();
 
@@ -55,9 +64,12 @@ export async function loadAndInitApiKey(): Promise<boolean> {
 }
 
 export async function clearApiKey(): Promise<void> {
-  await db.appSettings.update(1, {
-    geminiKeyHash: null,
-    geminiKeyIv: null,
-    updatedAt: new Date(),
-  });
+  const existing = await db.appSettings.get(1);
+  if (existing) {
+    await db.appSettings.update(1, {
+      geminiKeyHash: null,
+      geminiKeyIv: null,
+      updatedAt: new Date(),
+    });
+  }
 }

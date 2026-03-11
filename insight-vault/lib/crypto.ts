@@ -10,17 +10,37 @@ const STORAGE_KEY_MATERIAL = "iv_key_material";
 // ─── Derive or retrieve a device-bound CryptoKey ─────────────────────────────
 
 async function getOrCreateKeyMaterial(): Promise<CryptoKey> {
-  const stored = localStorage.getItem(STORAGE_KEY_MATERIAL);
+  if (typeof window === "undefined") {
+    throw new Error("Crypto operations are only available in the browser.");
+  }
+
   let rawKeyBytes: Uint8Array;
 
-  if (stored) {
-    rawKeyBytes = new Uint8Array(JSON.parse(stored) as number[]);
-  } else {
-    rawKeyBytes = crypto.getRandomValues(new Uint8Array(32));
-    localStorage.setItem(
-      STORAGE_KEY_MATERIAL,
-      JSON.stringify(Array.from(rawKeyBytes))
-    );
+  try {
+    const stored = localStorage.getItem(STORAGE_KEY_MATERIAL);
+    if (stored) {
+      const parsed = JSON.parse(stored);
+      if (!Array.isArray(parsed) || parsed.length !== 32) {
+        throw new Error("Corrupted key material");
+      }
+      rawKeyBytes = new Uint8Array(parsed as number[]);
+    } else {
+      rawKeyBytes = crypto.getRandomValues(new Uint8Array(32));
+      localStorage.setItem(
+        STORAGE_KEY_MATERIAL,
+        JSON.stringify(Array.from(rawKeyBytes))
+      );
+    }
+  } catch (err) {
+    if (err instanceof Error && err.message === "Corrupted key material") {
+      rawKeyBytes = crypto.getRandomValues(new Uint8Array(32));
+      localStorage.setItem(
+        STORAGE_KEY_MATERIAL,
+        JSON.stringify(Array.from(rawKeyBytes))
+      );
+    } else {
+      throw err;
+    }
   }
 
   return crypto.subtle.importKey("raw", rawKeyBytes.buffer as ArrayBuffer, "AES-GCM", false, [

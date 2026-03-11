@@ -28,7 +28,7 @@ interface AddInsightModalProps {
     content: string,
     type: InsightType,
     source?: string
-  ) => Promise<unknown>;
+  ) => Promise<{ insight: unknown; wasThreaded: boolean }>;
   saving: boolean;
   aiReady: boolean;
 }
@@ -45,9 +45,7 @@ export function AddInsightModal({ onAdd, saving, aiReady }: AddInsightModalProps
     if (!content.trim()) return;
 
     try {
-      const result = await onAdd(content.trim(), type, source.trim() || undefined) as
-        | { insight: unknown; wasThreaded: boolean }
-        | undefined;
+      const result = await onAdd(content.trim(), type, source.trim() || undefined);
       const threaded = result?.wasThreaded ?? false;
       toast(
         threaded
@@ -88,11 +86,13 @@ export function AddInsightModal({ onAdd, saving, aiReady }: AddInsightModalProps
           {/* Type selector */}
           <div className="space-y-1.5">
             <Label>Type</Label>
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="Insight type">
               {TYPES.map((t) => (
                 <button
                   key={t.value}
                   type="button"
+                  role="radio"
+                  aria-checked={type === t.value}
                   onClick={() => setType(t.value)}
                   className={`px-3 py-1.5 rounded-lg border text-xs font-medium transition-colors ${
                     type === t.value

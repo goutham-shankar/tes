@@ -5,8 +5,8 @@
 import { getGeminiClient, GEMINI_TEXT_MODEL } from "./gemini";
 
 const TAG_PROMPT = (text: string) => `
-You are a knowledge tagging assistant. Given the following insight text, 
-generate exactly 3 to 5 concise, lowercase, single-word or hyphenated tags 
+You are a knowledge tagging assistant. Given the following insight text,
+generate exactly 3 to 5 concise, lowercase, single-word or hyphenated tags
 that best categorise this content. Return ONLY valid JSON like:
 {"tags": ["tag1", "tag2", "tag3"]}
 
@@ -31,10 +31,22 @@ export async function generateTags(content: string): Promise<string[]> {
   }
 
   try {
-    const parsed = JSON.parse(jsonMatch[0]) as { tags: string[] };
+    const parsed = JSON.parse(jsonMatch[0]);
+
+    // Validate that parsed.tags is actually an array of strings
+    if (
+      !parsed ||
+      typeof parsed !== "object" ||
+      !Array.isArray(parsed.tags)
+    ) {
+      console.warn("Unexpected tag response structure:", parsed);
+      return [];
+    }
+
     return parsed.tags
-      .map((t) => t.toLowerCase().trim())
-      .filter((t) => t.length > 0)
+      .filter((t: unknown): t is string => typeof t === "string")
+      .map((t: string) => t.toLowerCase().trim())
+      .filter((t: string) => t.length > 0)
       .slice(0, 5);
   } catch {
     console.warn("Tag JSON parse error:", jsonMatch[0]);

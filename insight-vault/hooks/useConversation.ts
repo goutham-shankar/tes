@@ -86,13 +86,14 @@ export function useConversation() {
         isFirstReply.current = true;
       }
 
-      // Persist user message
-      await addChatMessage(convId, "user", userMessage);
+      // Build history BEFORE persisting the new user message to avoid race condition
+      const existingMessages = await getMessagesForConversation(convId);
+      const history = existingMessages.map(
+        (m): ConversationMessage => ({ role: m.role, content: m.content })
+      );
 
-      // Build history for the AI (exclude the message we just added — it's the new one)
-      const history = (await getMessagesForConversation(convId))
-        .slice(0, -1) // exclude the just-added user message
-        .map((m): ConversationMessage => ({ role: m.role, content: m.content }));
+      // Now persist user message
+      await addChatMessage(convId, "user", userMessage);
 
       // Stream the reply
       setStreaming(true);
@@ -104,9 +105,11 @@ export function useConversation() {
         let result = await gen.next();
 
         while (!result.done) {
-          const chunk = result.value as string;
-          fullReply += chunk;
-          setStreamBuffer(fullReply);
+          const chunk = result.value;
+          if (typeof chunk === "string") {
+            fullReply += chunk;
+            setStreamBuffer(fullReply);
+          }
           result = await gen.next();
         }
 
@@ -116,6 +119,7 @@ export function useConversation() {
         }
       } catch (err) {
         fullReply = "Sorry, something went wrong. Please try again.";
+        console.error("[InsightVault] Conversation stream error:", err);
         setError(err instanceof Error ? err.message : String(err));
       } finally {
         setStreaming(false);
@@ -157,8 +161,13 @@ export function useConversation() {
 
   const saveSuggestion = useCallback(
     async (messageId: string, content: string, tags: string[]) => {
-      await addInsight(content, "idea", undefined);
-      await markSuggestionSaved(messageId);
+      try {
+        await addInsight(content, "idea", undefined);
+        await markSuggestionSaved(messageId);
+      } catch (err) {
+        console.error("[InsightVault] Failed to save suggestion:", err);
+        setError("Failed to save insight from suggestion.");
+      }
     },
     [addInsight]
   );

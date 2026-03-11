@@ -7,8 +7,12 @@
 
 export function cosineSimilarity(a: number[], b: number[]): number {
   if (a.length !== b.length) {
-    throw new Error(`Vector dimension mismatch: ${a.length} vs ${b.length}`);
+    // Gracefully handle dimension mismatch instead of crashing
+    console.warn(`Vector dimension mismatch: ${a.length} vs ${b.length}`);
+    return 0;
   }
+  if (a.length === 0) return 0;
+
   let dot = 0;
   let normA = 0;
   let normB = 0;
@@ -50,6 +54,10 @@ export function topKSearch(
   k = 5,
   threshold = 0.3
 ): SearchResult[] {
+  if (!queryEmbedding || queryEmbedding.length === 0) {
+    return [];
+  }
+
   const scored = documents
     .filter((d) => d.embedding && d.embedding.length > 0)
     .map((d) => ({
@@ -58,7 +66,7 @@ export function topKSearch(
       tags: d.tags,
       score: cosineSimilarity(queryEmbedding, d.embedding),
     }))
-    .filter((r) => r.score >= threshold)
+    .filter((r) => r.score >= threshold && isFinite(r.score))
     .sort((a, b) => b.score - a.score);
 
   return scored.slice(0, k);
@@ -88,11 +96,16 @@ export function clusterInsights<T extends { id: string; embedding: number[] }>(
     for (const cluster of clusters) {
       const rep = cluster[0];
       if (!rep.embedding || rep.embedding.length === 0) continue;
-      const sim = cosineSimilarity(item.embedding, rep.embedding);
-      if (sim >= threshold) {
-        cluster.push(item);
-        placed = true;
-        break;
+      try {
+        const sim = cosineSimilarity(item.embedding, rep.embedding);
+        if (sim >= threshold) {
+          cluster.push(item);
+          placed = true;
+          break;
+        }
+      } catch {
+        // Skip this cluster on error
+        continue;
       }
     }
     if (!placed) clusters.push([item]);
@@ -119,6 +132,7 @@ export function clusterByTags<T extends { id: string; tags: string[] }>(
     let placed = false;
     for (const cluster of clusters) {
       const rep = cluster[0];
+      if (!rep.tags || rep.tags.length === 0) continue;
       const shared = item.tags.filter((t) => rep.tags.includes(t)).length;
       if (shared >= minShared) {
         cluster.push(item);

@@ -14,12 +14,22 @@ export function useApiKey() {
 
   // On mount, attempt to restore the saved key
   useEffect(() => {
+    let cancelled = false;
     (async () => {
-      const ok = await loadAndInitApiKey();
-      setReady(ok);
-      if (ok) setPreview(getKeyPreview());
-      setLoading(false);
+      try {
+        const ok = await loadAndInitApiKey();
+        if (cancelled) return;
+        setReady(ok);
+        if (ok) setPreview(getKeyPreview());
+      } catch (err) {
+        console.error("[InsightVault] Failed to load API key on startup:", err);
+        if (cancelled) return;
+        setReady(false);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
     })();
+    return () => { cancelled = true; };
   }, []);
 
   const save = useCallback(async (key: string) => {

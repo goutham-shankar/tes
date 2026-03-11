@@ -66,6 +66,7 @@ export function ChatPanel({
           <Button
             variant="ghost"
             size="icon"
+            aria-label="Clear chat history"
             className="h-7 w-7 text-muted-foreground hover:text-destructive"
             onClick={onClear}
           >
@@ -104,6 +105,7 @@ export function ChatPanel({
                   ? "bg-primary/20 text-primary"
                   : "bg-muted text-muted-foreground"
               )}
+              aria-hidden="true"
             >
               {msg.role === "user" ? (
                 <User className="w-3.5 h-3.5" />
@@ -126,20 +128,20 @@ export function ChatPanel({
 
         {/* Streaming chunk */}
         {streaming && streamBuffer && (
-          <div className="flex gap-3 animate-fade-in">
-            <div className="flex-shrink-0 w-7 h-7 rounded-full bg-muted text-muted-foreground flex items-center justify-center">
+          <div className="flex gap-3 animate-fade-in" role="status" aria-live="polite">
+            <div className="flex-shrink-0 w-7 h-7 rounded-full bg-muted text-muted-foreground flex items-center justify-center" aria-hidden="true">
               <Bot className="w-3.5 h-3.5" />
             </div>
             <div className="max-w-[85%] rounded-2xl rounded-tl-sm bg-muted px-4 py-3 text-sm leading-relaxed">
               <p className="whitespace-pre-wrap">{streamBuffer}</p>
-              <span className="inline-block w-1.5 h-4 bg-primary/60 animate-pulse ml-0.5 align-middle" />
+              <span className="inline-block w-1.5 h-4 bg-primary/60 animate-pulse ml-0.5 align-middle" aria-hidden="true" />
             </div>
           </div>
         )}
 
         {streaming && !streamBuffer && (
-          <div className="flex gap-3">
-            <div className="flex-shrink-0 w-7 h-7 rounded-full bg-muted flex items-center justify-center">
+          <div className="flex gap-3" role="status" aria-live="polite" aria-label="AI is thinking">
+            <div className="flex-shrink-0 w-7 h-7 rounded-full bg-muted flex items-center justify-center" aria-hidden="true">
               <Loader2 className="w-3.5 h-3.5 animate-spin text-muted-foreground" />
             </div>
             <div className="bg-muted rounded-2xl rounded-tl-sm px-4 py-3 text-sm text-muted-foreground">
@@ -149,7 +151,7 @@ export function ChatPanel({
         )}
 
         {error && (
-          <p className="text-xs text-destructive text-center px-4">{error}</p>
+          <p className="text-xs text-destructive text-center px-4" role="alert">{error}</p>
         )}
 
         <div ref={bottomRef} />
@@ -175,12 +177,14 @@ export function ChatPanel({
             disabled={!aiReady || streaming}
             className="min-h-[44px] max-h-[120px] resize-none text-sm"
             rows={1}
+            aria-label="Chat message input"
           />
           <Button
             size="icon"
             onClick={handleSend}
             disabled={!aiReady || streaming || !input.trim()}
             className="shrink-0 h-10 w-10"
+            aria-label="Send message"
           >
             {streaming ? (
               <Loader2 className="w-4 h-4 animate-spin" />
