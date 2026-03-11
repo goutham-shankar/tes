@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { Markdown } from "@/components/ui/markdown";
 import { type ChatMessage } from "@/db/schema";
 import { cn } from "@/lib/utils";
 
@@ -35,7 +36,6 @@ export function ChatPanel({
   const [input, setInput] = useState("");
   const bottomRef = useRef<HTMLDivElement>(null);
 
-  // Auto-scroll to latest message
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, streamBuffer]);
@@ -121,7 +121,11 @@ export function ChatPanel({
                   : "bg-muted text-foreground rounded-tl-sm"
               )}
             >
-              <p className="whitespace-pre-wrap">{msg.content}</p>
+              {msg.role === "assistant" ? (
+                <Markdown content={msg.content} />
+              ) : (
+                <p className="whitespace-pre-wrap">{msg.content}</p>
+              )}
             </div>
           </div>
         ))}
@@ -133,7 +137,7 @@ export function ChatPanel({
               <Bot className="w-3.5 h-3.5" />
             </div>
             <div className="max-w-[85%] rounded-2xl rounded-tl-sm bg-muted px-4 py-3 text-sm leading-relaxed">
-              <p className="whitespace-pre-wrap">{streamBuffer}</p>
+              <Markdown content={streamBuffer} />
               <span className="inline-block w-1.5 h-4 bg-primary/60 animate-pulse ml-0.5 align-middle" aria-hidden="true" />
             </div>
           </div>
