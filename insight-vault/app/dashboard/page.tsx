@@ -1,7 +1,8 @@
 "use client";
-import { LayoutDashboard, Loader2 } from "lucide-react";
+import { LayoutDashboard } from "lucide-react";
 import { AppShell } from "@/components/layout/AppShell";
 import { DashboardView } from "@/components/dashboard/DashboardView";
+import { DashboardSkeleton } from "@/components/ui/skeleton";
 import { useDashboard } from "@/hooks/useDashboard";
 
 export default function DashboardPage() {
@@ -19,9 +20,7 @@ export default function DashboardPage() {
         {stats ? (
           <DashboardView stats={stats} />
         ) : (
-          <div className="flex items-center justify-center py-20">
-            <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
-          </div>
+          <DashboardSkeleton />
         )}
       </div>
     </AppShell>
