@@ -28,7 +28,7 @@ interface AddInsightModalProps {
     content: string,
     type: InsightType,
     source?: string
-  ) => Promise<{ insight: unknown; wasThreaded: boolean }>;
+  ) => Promise<{ insight: unknown; wasThreaded: boolean; mergeReason?: string }>;
   saving: boolean;
   aiReady: boolean;
 }
@@ -47,9 +47,12 @@ export function AddInsightModal({ onAdd, saving, aiReady }: AddInsightModalProps
     try {
       const result = await onAdd(content.trim(), type, source.trim() || undefined);
       const threaded = result?.wasThreaded ?? false;
+      const reason = result?.mergeReason;
       toast(
         threaded
-          ? "Added as a follow-up to a related insight!"
+          ? reason
+            ? `Merged with a related insight: ${reason}`
+            : "Added as a follow-up to a related insight!"
           : aiReady
           ? "Insight saved! AI has classified and stored it."
           : "Insight saved locally (add API key to enable AI features).",
