@@ -27,6 +27,7 @@ export interface Insight {
   embedding: number[];   // Gemini text-embedding-004
   source?: string;       // optional book title / URL / person
   threads?: InsightThread[]; // follow-up notes on the same idea
+  favorite?: boolean;    // bookmarked insight
   createdAt: Date;
   updatedAt: Date;
 }
@@ -106,6 +107,14 @@ class InsightVaultDB extends Dexie {
 
     // v3: add updatedAt index on conversations
     this.version(3).stores({
+      insights: "id, type, createdAt, *tags",
+      conversations: "id, createdAt, updatedAt",
+      chatMessages: "id, conversationId, role, createdAt",
+      appSettings: "id",
+    });
+
+    // v4: add favorite field support (no schema index change needed)
+    this.version(4).stores({
       insights: "id, type, createdAt, *tags",
       conversations: "id, createdAt, updatedAt",
       chatMessages: "id, conversationId, role, createdAt",

@@ -10,6 +10,8 @@ import {
   addInsight,
   appendThread,
   deleteInsight,
+  updateInsight,
+  toggleFavorite,
   searchInsightsByText,
   getAllTags,
   getAllInsightsWithEmbeddings,
@@ -35,35 +37,44 @@ export function useInsights() {
       content: string,
       type: InsightType,
       source?: string
-    ) => {
+    ): Promise<{ insight: unknown; wasThreaded: boolean }> => {
       setError(null);
       setSaving(true);
       try {
-        let tags: string[] = [];
+        let aiTags: string[] = [];
         let embedding: number[] = [];
 
         if (isGeminiReady()) {
-          // Run tagging and embedding in parallel
-          const [aiTags, emb] = await Promise.all([
+          const [tagResult, embResult] = await Promise.allSettled([
             generateTags(content),
             generateEmbedding(content),
           ]);
-          tags = aiTags;
-          embedding = emb;
+          aiTags = tagResult.status === "fulfilled" ? tagResult.value : [];
+          embedding = embResult.status === "fulfilled" ? embResult.value : [];
 
-          // ── Auto-threading: if very similar to an existing insight, append as thread ──
+          if (tagResult.status === "rejected") {
+            console.warn("[InsightVault] Tag generation failed:", tagResult.reason);
+          }
+          if (embResult.status === "rejected") {
+            console.warn("[InsightVault] Embedding generation failed:", embResult.reason);
+          }
+
+          // Auto-threading
           if (embedding.length > 0) {
-            const existing = await getAllInsightsWithEmbeddings();
-            const matches = topKSearch(embedding, existing, 1, 0.75);
-            if (matches.length > 0) {
-              // Thread to the existing insight instead of creating a duplicate
-              const updated = await appendThread(matches[0].id, content);
-              return { insight: updated, wasThreaded: true };
+            try {
+              const existing = await getAllInsightsWithEmbeddings();
+              const matches = topKSearch(embedding, existing, 1, 0.75);
+              if (matches.length > 0) {
+                const updated = await appendThread(matches[0].id, content);
+                return { insight: updated, wasThreaded: true };
+              }
+            } catch (err) {
+              console.warn("[InsightVault] Auto-threading check failed:", err);
             }
           }
         }
 
-        const insight = await addInsight(content, type, tags, embedding, source);
+        const insight = await addInsight(content, type, aiTags, embedding, source);
         return { insight, wasThreaded: false };
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
@@ -76,8 +87,22 @@ export function useInsights() {
     []
   );
 
+  const edit = useCallback(
+    async (
+      id: string,
+      updates: { content: string; type: InsightType; source?: string }
+    ) => {
+      await updateInsight(id, updates);
+    },
+    []
+  );
+
   const remove = useCallback(async (id: string) => {
     await deleteInsight(id);
+  }, []);
+
+  const toggleFav = useCallback(async (id: string) => {
+    await toggleFavorite(id);
   }, []);
 
   const search = useCallback(async (q: string) => {
@@ -85,5 +110,5 @@ export function useInsights() {
     return searchInsightsByText(q);
   }, [insights]);
 
-  return { insights, tags, saving, error, addNew, remove, search };
+  return { insights, tags, saving, error, addNew, edit, remove, toggleFav, search };
 }

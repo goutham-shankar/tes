@@ -8,7 +8,7 @@ import { useInsights } from "@/hooks/useInsights";
 import { cn } from "@/lib/utils";
 
 export default function TagsPage() {
-  const { insights, tags, remove } = useInsights();
+  const { insights, tags, remove, edit, toggleFav } = useInsights();
   const [selected, setSelected] = useState<string | null>(null);
 
   return (
@@ -18,6 +18,9 @@ export default function TagsPage() {
         <div className="flex items-center gap-2">
           <Tag className="w-4 h-4 text-muted-foreground" />
           <h1 className="font-semibold text-sm text-muted-foreground">Tags</h1>
+          <span className="text-xs bg-muted rounded-full px-2 py-0.5 text-muted-foreground">
+            {tags.length}
+          </span>
         </div>
 
         {/* Tag Cloud */}
@@ -62,6 +65,8 @@ export default function TagsPage() {
             <InsightFeed
               insights={insights}
               onDelete={remove}
+              onEdit={edit}
+              onToggleFavorite={toggleFav}
               filterTag={selected}
             />
           </div>
