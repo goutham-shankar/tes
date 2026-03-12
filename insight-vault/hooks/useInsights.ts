@@ -8,7 +8,7 @@ import { useLiveQuery } from "dexie-react-hooks";
 import { db, type InsightType } from "@/db/schema";
 import {
   addInsight,
-  appendThread,
+  mergeInsight,
   deleteInsight,
   updateInsight,
   toggleFavorite,
@@ -18,6 +18,7 @@ import {
 } from "@/db/operations";
 import { generateTags } from "@/services/ai/tagging";
 import { generateEmbedding } from "@/services/ai/embedding";
+import { checkSimilarity } from "@/services/ai/similarity";
 import { isGeminiReady } from "@/services/ai/gemini";
 import { topKSearch } from "@/lib/vector";
 
@@ -37,7 +38,7 @@ export function useInsights() {
       content: string,
       type: InsightType,
       source?: string
-    ): Promise<{ insight: unknown; wasThreaded: boolean }> => {
+    ): Promise<{ insight: unknown; wasThreaded: boolean; mergeReason?: string }> => {
       setError(null);
       setSaving(true);
       try {
@@ -59,17 +60,38 @@ export function useInsights() {
             console.warn("[InsightVault] Embedding generation failed:", embResult.reason);
           }
 
-          // Auto-threading
+          // Smart merge: embedding pre-filter → LLM verification
           if (embedding.length > 0) {
             try {
               const existing = await getAllInsightsWithEmbeddings();
-              const matches = topKSearch(embedding, existing, 1, 0.75);
-              if (matches.length > 0) {
-                const updated = await appendThread(matches[0].id, content);
-                return { insight: updated, wasThreaded: true };
+              // Lower threshold to catch more candidates; LLM will verify
+              const candidates = topKSearch(embedding, existing, 5, 0.55);
+
+              if (candidates.length > 0) {
+                const similarity = await checkSimilarity(
+                  content,
+                  candidates.map((c) => ({
+                    id: c.id,
+                    content: c.content,
+                    tags: c.tags,
+                  }))
+                );
+
+                if (similarity.matchId) {
+                  const merged = await mergeInsight(
+                    similarity.matchId,
+                    content,
+                    aiTags
+                  );
+                  return {
+                    insight: merged,
+                    wasThreaded: true,
+                    mergeReason: similarity.reason,
+                  };
+                }
               }
             } catch (err) {
-              console.warn("[InsightVault] Auto-threading check failed:", err);
+              console.warn("[InsightVault] Smart merge check failed:", err);
             }
           }
         }

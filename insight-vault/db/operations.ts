@@ -105,6 +105,31 @@ export async function appendThread(
   return { ...insight, threads };
 }
 
+/**
+ * Merge a new insight into an existing one: appends as a thread AND
+ * combines tags (deduplicated).
+ */
+export async function mergeInsight(
+  insightId: string,
+  content: string,
+  newTags: string[]
+): Promise<Insight> {
+  const insight = await db.insights.get(insightId);
+  if (!insight) throw new Error("Insight not found");
+
+  const threads = [...(insight.threads ?? []), { content, addedAt: new Date() }];
+  const mergedTags = [...new Set([...insight.tags, ...newTags])];
+  const now = new Date();
+
+  await db.insights.update(insightId, {
+    threads,
+    tags: mergedTags,
+    updatedAt: now,
+  });
+
+  return { ...insight, threads, tags: mergedTags, updatedAt: now };
+}
+
 export async function getAllTags(): Promise<string[]> {
   const insights = await db.insights.toArray();
   const tagSet = new Set<string>();
