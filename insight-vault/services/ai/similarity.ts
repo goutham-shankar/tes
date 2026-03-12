@@ -4,6 +4,7 @@
  * idea and, if so, produces a merged summary.
  */
 import { getGeminiClient, GEMINI_TEXT_MODEL } from "./gemini";
+import { buildMemoryContext } from "./memory";
 
 export interface SimilarityCandidate {
   id: string;
@@ -42,10 +43,21 @@ export async function checkSimilarity(
     )
     .join("\n\n");
 
+  // Include memory context for better understanding of the user's knowledge patterns
+  let memorySection = "";
+  try {
+    const memCtx = await buildMemoryContext(newContent);
+    if (memCtx) {
+      memorySection = `\nUSER'S KNOWLEDGE PATTERNS (memories from past insights):\n${memCtx}\n`;
+    }
+  } catch {
+    // Non-critical, continue without memories
+  }
+
   const prompt = `You are an insight deduplication assistant.
 
 A user is adding a NEW insight to their vault. Below are existing insights that are potentially similar (found via embedding search).
-
+${memorySection}
 NEW INSIGHT:
 ${newContent}
 

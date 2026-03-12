@@ -101,21 +101,27 @@ export function InsightCard({ insight, onDelete, onEdit, onToggleFavorite }: Ins
         </div>
       )}
 
-      {/* Threads — follow-up notes */}
+      {/* Merged insights — unified card view */}
       {insight.threads && insight.threads.length > 0 && (
-        <div className="mt-4 border-l-2 border-primary/20 pl-3 flex flex-col gap-3">
-          <div className="flex items-center gap-1.5 text-xs text-muted-foreground font-medium">
-            <GitBranch className="w-3 h-3" />
-            {insight.threads.length} follow-up{insight.threads.length > 1 ? "s" : ""}
+        <div className="mt-4 space-y-2">
+          <div className="flex items-center gap-1.5 text-xs font-medium">
+            <GitBranch className="w-3 h-3 text-primary" />
+            <span className="text-primary">
+              {insight.threads.length + 1} merged insight{insight.threads.length > 0 ? "s" : ""}
+            </span>
           </div>
-          {insight.threads.map((thread, idx) => (
-            <div key={idx} className="text-xs text-foreground/80 leading-relaxed">
-              <span className="text-muted-foreground mr-2">
-                {formatDate(thread.addedAt)}
-              </span>
-              {thread.content}
-            </div>
-          ))}
+          <div className="rounded-lg border border-primary/15 bg-primary/5 divide-y divide-primary/10">
+            {insight.threads.map((thread, idx) => (
+              <div key={idx} className="px-3 py-2.5">
+                <p className="text-sm text-foreground/90 leading-relaxed whitespace-pre-wrap">
+                  {thread.content}
+                </p>
+                <span className="text-[10px] text-muted-foreground mt-1 block">
+                  {formatDate(thread.addedAt)}
+                </span>
+              </div>
+            ))}
+          </div>
         </div>
       )}
     </article>

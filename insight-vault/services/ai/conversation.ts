@@ -10,6 +10,7 @@
  */
 import { getGeminiClient, GEMINI_TEXT_MODEL } from "./gemini";
 import { generateEmbedding } from "./embedding";
+import { buildMemoryContext } from "./memory";
 import { getAllInsightsWithEmbeddings, getAllInsights } from "@/db/operations";
 import { topKSearch } from "@/lib/vector";
 
@@ -27,7 +28,7 @@ export interface SaveSuggestion {
 
 // ── System prompt builder ──────────────────────────────────────────────────────
 
-function buildSystemPrompt(notesContext: string): string {
+function buildSystemPrompt(notesContext: string, memoriesContext: string): string {
   return `You are InsightVault AI — a brilliant, warm, conversational personal knowledge assistant, like a supercharged ChatGPT that has read every note the user has ever saved.
 
 Your personality: curious, thoughtful, intellectually stimulating. You make the user feel like they're talking to the smartest friend they have.
@@ -39,6 +40,11 @@ Your capabilities:
 - Surface patterns the user hasn't noticed
 - Suggest new angles, related concepts, and actionable next steps
 - When the user says something insightful, suggest saving it
+
+USER'S KNOWLEDGE MEMORIES (patterns and themes you've observed):
+────────────────────────────────────────────────────────
+${memoriesContext || "No memories yet — the user is just getting started."}
+────────────────────────────────────────────────────────
 
 USER'S VAULT NOTES (use these as context when relevant):
 ────────────────────────────────────────────────────────
@@ -116,8 +122,11 @@ export async function* streamConversation(
   history: ConversationMessage[],
   userMessage: string
 ): AsyncGenerator<string, string, unknown> {
-  const notesContext = await buildNotesContext(userMessage);
-  const systemPrompt = buildSystemPrompt(notesContext);
+  const [notesContext, memoriesContext] = await Promise.all([
+    buildNotesContext(userMessage),
+    buildMemoryContext(userMessage).catch(() => ""),
+  ]);
+  const systemPrompt = buildSystemPrompt(notesContext, memoriesContext);
 
   // Flatten history into a readable transcript
   const transcript = history
