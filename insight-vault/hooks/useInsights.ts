@@ -19,6 +19,7 @@ import {
 import { generateTags } from "@/services/ai/tagging";
 import { generateEmbedding } from "@/services/ai/embedding";
 import { checkSimilarity } from "@/services/ai/similarity";
+import { extractMemories } from "@/services/ai/memory";
 import { isGeminiReady } from "@/services/ai/gemini";
 import { topKSearch } from "@/lib/vector";
 
@@ -78,11 +79,21 @@ export function useInsights() {
                 );
 
                 if (similarity.matchId) {
+                  const matchedCandidate = candidates.find(
+                    (c) => c.id === similarity.matchId
+                  );
                   const merged = await mergeInsight(
                     similarity.matchId,
                     content,
                     aiTags
                   );
+                  // Extract memories in background (don't block UI)
+                  extractMemories(
+                    content,
+                    similarity.matchId,
+                    matchedCandidate?.content,
+                    similarity.matchId
+                  ).catch(() => {});
                   return {
                     insight: merged,
                     wasThreaded: true,
@@ -97,6 +108,10 @@ export function useInsights() {
         }
 
         const insight = await addInsight(content, type, aiTags, embedding, source);
+        // Extract memories in background
+        if (isGeminiReady()) {
+          extractMemories(content, insight.id).catch(() => {});
+        }
         return { insight, wasThreaded: false };
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);

@@ -2,7 +2,7 @@
  * db/operations.ts
  * CRUD helpers for InsightVault DB
  */
-import { db, type Insight, type InsightType, type ChatMessage, type Conversation } from "./schema";
+import { db, type Insight, type InsightType, type ChatMessage, type Conversation, type Memory } from "./schema";
 
 // ─── Insights ─────────────────────────────────────────────────────────────────
 
@@ -176,6 +176,81 @@ export async function importInsights(
     }
   }
   return imported;
+}
+
+// ─── Memories ────────────────────────────────────────────────────────────────
+
+export async function addMemory(
+  content: string,
+  sourceInsightIds: string[],
+  category: Memory["category"],
+  embedding: number[]
+): Promise<Memory> {
+  const now = new Date();
+  const memory: Memory = {
+    id: crypto.randomUUID(),
+    content,
+    sourceInsightIds,
+    category,
+    embedding,
+    createdAt: now,
+    updatedAt: now,
+  };
+  await db.memories.add(memory);
+  return memory;
+}
+
+export async function getAllMemories(): Promise<Memory[]> {
+  return db.memories.orderBy("createdAt").reverse().toArray();
+}
+
+export async function getMemoriesForInsight(insightId: string): Promise<Memory[]> {
+  return db.memories
+    .filter((m) => m.sourceInsightIds.includes(insightId))
+    .toArray();
+}
+
+export async function getAllMemoriesWithEmbeddings(): Promise<
+  Pick<Memory, "id" | "content" | "category" | "embedding">[]
+> {
+  return db.memories
+    .filter((m) => m.embedding && m.embedding.length > 0)
+    .toArray()
+    .then((rows) =>
+      rows.map(({ id, content, category, embedding }) => ({
+        id,
+        content,
+        category,
+        embedding,
+      }))
+    );
+}
+
+export async function updateMemory(
+  id: string,
+  content: string,
+  additionalInsightIds: string[]
+): Promise<void> {
+  const memory = await db.memories.get(id);
+  if (!memory) return;
+  const sourceInsightIds = [...new Set([...memory.sourceInsightIds, ...additionalInsightIds])];
+  await db.memories.update(id, { content, sourceInsightIds, updatedAt: new Date() });
+}
+
+export async function deleteMemoriesForInsight(insightId: string): Promise<void> {
+  const memories = await db.memories
+    .filter((m) => m.sourceInsightIds.includes(insightId))
+    .toArray();
+  for (const m of memories) {
+    if (m.sourceInsightIds.length === 1) {
+      await db.memories.delete(m.id);
+    } else {
+      await db.memories.update(m.id, {
+        sourceInsightIds: m.sourceInsightIds.filter((id) => id !== insightId),
+        updatedAt: new Date(),
+      });
+    }
+  }
 }
 
 // ─── Theme ──────────────────────────────────────────────────────────────────

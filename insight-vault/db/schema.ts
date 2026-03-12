@@ -52,6 +52,21 @@ export interface ChatMessage {
   createdAt: Date;
 }
 
+/** Persistent memory entry for LLM context across sessions */
+export interface Memory {
+  id: string;
+  /** The extracted pattern, theme, or summary */
+  content: string;
+  /** Which insight IDs contributed to this memory */
+  sourceInsightIds: string[];
+  /** Memory category: theme, pattern, summary, connection */
+  category: "theme" | "pattern" | "summary" | "connection";
+  /** Embedding for semantic retrieval */
+  embedding: number[];
+  createdAt: Date;
+  updatedAt: Date;
+}
+
 export interface AppSettings {
   id: 1;              // singleton row
   geminiKeyHash: string | null;  // AES-GCM encrypted key
@@ -65,6 +80,7 @@ export interface AppSettings {
 
 class InsightVaultDB extends Dexie {
   insights!: EntityTable<Insight, "id">;
+  memories!: EntityTable<Memory, "id">;
   conversations!: EntityTable<Conversation, "id">;
   chatMessages!: EntityTable<ChatMessage, "id">;
   appSettings!: EntityTable<AppSettings, "id">;
@@ -116,6 +132,15 @@ class InsightVaultDB extends Dexie {
     // v4: add favorite field support (no schema index change needed)
     this.version(4).stores({
       insights: "id, type, createdAt, *tags",
+      conversations: "id, createdAt, updatedAt",
+      chatMessages: "id, conversationId, role, createdAt",
+      appSettings: "id",
+    });
+
+    // v5: add memories table for persistent LLM context
+    this.version(5).stores({
+      insights: "id, type, createdAt, *tags",
+      memories: "id, category, createdAt, *sourceInsightIds",
       conversations: "id, createdAt, updatedAt",
       chatMessages: "id, conversationId, role, createdAt",
       appSettings: "id",
