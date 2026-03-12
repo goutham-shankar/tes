@@ -3,8 +3,6 @@ import { useState, useMemo } from "react";
 import {
   Search,
   Inbox,
-  Layers,
-  FolderOpen,
   SlidersHorizontal,
   X,
   Star,
@@ -14,6 +12,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { InsightCard } from "./InsightCard";
+import { TopicCard } from "./TopicCard";
 import { type Insight, type InsightType } from "@/db/schema";
 import { cn } from "@/lib/utils";
 
@@ -297,7 +296,7 @@ export function InsightFeed({ insights, onDelete, onEdit, onToggleFavorite, filt
           </p>
         </div>
       ) : (
-        <div className="flex flex-col gap-6">
+        <div className="flex flex-col gap-4">
           {topicGroups.map((group, gi) =>
             group.insights.length === 1 ? (
               <InsightCard
@@ -308,26 +307,14 @@ export function InsightFeed({ insights, onDelete, onEdit, onToggleFavorite, filt
                 onToggleFavorite={onToggleFavorite}
               />
             ) : (
-              <div key={group.topicId ?? gi} className="rounded-xl border border-primary/20 bg-primary/5 p-4 space-y-3">
-                <div className="flex items-center gap-2 text-sm font-medium">
-                  <FolderOpen className="w-4 h-4 text-primary" />
-                  <span className="text-primary">{group.topicLabel}</span>
-                  <span className="text-xs text-muted-foreground ml-1">
-                    {group.insights.length} insights
-                  </span>
-                </div>
-                <div className="grid gap-3 grid-cols-1 xl:grid-cols-2">
-                  {group.insights.map((insight) => (
-                    <InsightCard
-                      key={insight.id}
-                      insight={insight}
-                      onDelete={onDelete}
-                      onEdit={onEdit}
-                      onToggleFavorite={onToggleFavorite}
-                    />
-                  ))}
-                </div>
-              </div>
+              <TopicCard
+                key={group.topicId ?? gi}
+                topicLabel={group.topicLabel}
+                insights={group.insights}
+                onDelete={onDelete}
+                onEdit={onEdit}
+                onToggleFavorite={onToggleFavorite}
+              />
             )
           )}
         </div>
