@@ -11,7 +11,9 @@ export async function addInsight(
   type: InsightType,
   tags: string[],
   embedding: number[],
-  source?: string
+  source?: string,
+  topicId?: string,
+  topicLabel?: string
 ): Promise<Insight> {
   const now = new Date();
   const insight: Insight = {
@@ -21,11 +23,22 @@ export async function addInsight(
     tags,
     embedding,
     source,
+    topicId,
+    topicLabel,
     createdAt: now,
     updatedAt: now,
   };
   await db.insights.add(insight);
   return insight;
+}
+
+/** Assign a topic to an existing insight */
+export async function assignTopic(
+  insightId: string,
+  topicId: string,
+  topicLabel: string
+): Promise<void> {
+  await db.insights.update(insightId, { topicId, topicLabel, updatedAt: new Date() });
 }
 
 export async function getAllInsights(): Promise<Insight[]> {
@@ -78,17 +91,19 @@ export async function searchInsightsByText(query: string): Promise<Insight[]> {
 }
 
 export async function getAllInsightsWithEmbeddings(): Promise<
-  Pick<Insight, "id" | "content" | "tags" | "embedding">[]
+  Pick<Insight, "id" | "content" | "tags" | "embedding" | "topicId" | "topicLabel">[]
 > {
   return db.insights
     .filter((i) => i.embedding && i.embedding.length > 0)
     .toArray()
     .then((rows) =>
-      rows.map(({ id, content, tags, embedding }) => ({
+      rows.map(({ id, content, tags, embedding, topicId, topicLabel }) => ({
         id,
         content,
         tags,
         embedding,
+        topicId,
+        topicLabel,
       }))
     );
 }

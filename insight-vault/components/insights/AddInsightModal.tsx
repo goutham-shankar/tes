@@ -28,7 +28,13 @@ interface AddInsightModalProps {
     content: string,
     type: InsightType,
     source?: string
-  ) => Promise<{ insight: unknown; wasThreaded: boolean; mergeReason?: string }>;
+  ) => Promise<{
+    insight: unknown;
+    wasThreaded: boolean;
+    wasGrouped: boolean;
+    mergeReason?: string;
+    topicLabel?: string;
+  }>;
   saving: boolean;
   aiReady: boolean;
 }
@@ -47,17 +53,23 @@ export function AddInsightModal({ onAdd, saving, aiReady }: AddInsightModalProps
     try {
       const result = await onAdd(content.trim(), type, source.trim() || undefined);
       const threaded = result?.wasThreaded ?? false;
+      const grouped = result?.wasGrouped ?? false;
       const reason = result?.mergeReason;
-      toast(
-        threaded
-          ? reason
-            ? `Merged with a related insight: ${reason}`
-            : "Added as a follow-up to a related insight!"
-          : aiReady
-          ? "Insight saved! AI has classified and stored it."
-          : "Insight saved locally (add API key to enable AI features).",
-        "success"
-      );
+      const topic = result?.topicLabel;
+
+      let message: string;
+      if (threaded) {
+        message = reason
+          ? `Merged with existing insight: ${reason}`
+          : "Merged with a related insight!";
+      } else if (grouped && topic) {
+        message = `Grouped under "${topic}" — find all related insights together!`;
+      } else if (aiReady) {
+        message = "Insight saved! AI has classified and stored it.";
+      } else {
+        message = "Insight saved locally (add API key to enable AI features).";
+      }
+      toast(message, "success");
       // Reset
       setContent("");
       setSource("");
