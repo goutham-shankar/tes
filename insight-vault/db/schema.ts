@@ -28,6 +28,8 @@ export interface Insight {
   source?: string;       // optional book title / URL / person
   threads?: InsightThread[]; // follow-up notes on the same idea
   favorite?: boolean;    // bookmarked insight
+  topicId?: string;      // groups related insights together
+  topicLabel?: string;   // human-readable topic name (e.g. "Morning Routines")
   createdAt: Date;
   updatedAt: Date;
 }
@@ -140,6 +142,15 @@ class InsightVaultDB extends Dexie {
     // v5: add memories table for persistent LLM context
     this.version(5).stores({
       insights: "id, type, createdAt, *tags",
+      memories: "id, category, createdAt, *sourceInsightIds",
+      conversations: "id, createdAt, updatedAt",
+      chatMessages: "id, conversationId, role, createdAt",
+      appSettings: "id",
+    });
+
+    // v6: add topicId index for topic-based grouping
+    this.version(6).stores({
+      insights: "id, type, createdAt, *tags, topicId",
       memories: "id, category, createdAt, *sourceInsightIds",
       conversations: "id, createdAt, updatedAt",
       chatMessages: "id, conversationId, role, createdAt",

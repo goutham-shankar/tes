@@ -1,7 +1,9 @@
 /**
  * services/ai/similarity.ts
- * Uses Gemini LLM to semantically verify whether insights are about the same
- * idea and, if so, produces a merged summary.
+ * Uses Gemini LLM to determine whether a new insight should be:
+ *   1. MERGED into an existing insight (same idea, thread it)
+ *   2. GROUPED with an existing insight (same topic, keep separate but show together)
+ *   3. Standalone (new topic entirely)
  */
 import { getGeminiClient, GEMINI_TEXT_MODEL } from "./gemini";
 import { buildMemoryContext } from "./memory";
@@ -10,27 +12,32 @@ export interface SimilarityCandidate {
   id: string;
   content: string;
   tags: string[];
+  topicId?: string;
+  topicLabel?: string;
 }
 
 export interface SimilarityResult {
-  /** The ID of the matched existing insight (null if no match) */
+  /** "merge" = same idea, thread it; "group" = same topic, keep separate; "new" = unrelated */
+  action: "merge" | "group" | "new";
+  /** The ID of the matched existing insight (null if "new") */
   matchId: string | null;
-  /** Short reason explaining the merge decision */
+  /** Short reason explaining the decision */
   reason: string;
-  /** Combined tags from both insights (deduplicated) */
-  mergedTags: string[];
+  /** Topic ID to assign (existing topicId from match, or null for new topic) */
+  topicId: string | null;
+  /** Topic label (existing or LLM-generated) */
+  topicLabel: string;
 }
 
 /**
- * Ask the LLM whether a new insight is semantically related to any of the
- * candidate insights.  Returns the best match (if any) along with merged tags.
+ * Ask the LLM whether a new insight should be merged, grouped, or standalone.
  */
 export async function checkSimilarity(
   newContent: string,
   candidates: SimilarityCandidate[]
 ): Promise<SimilarityResult> {
   if (candidates.length === 0) {
-    return { matchId: null, reason: "", mergedTags: [] };
+    return { action: "new", matchId: null, reason: "", topicId: null, topicLabel: "" };
   }
 
   const client = getGeminiClient();
@@ -39,24 +46,25 @@ export async function checkSimilarity(
   const candidateList = candidates
     .map(
       (c, i) =>
-        `[${i + 1}] (id: ${c.id})\n${c.content}\nTags: ${c.tags.join(", ") || "none"}`
+        `[${i + 1}] (id: ${c.id})${c.topicLabel ? ` [Topic: ${c.topicLabel}]` : ""}
+${c.content}
+Tags: ${c.tags.join(", ") || "none"}`
     )
     .join("\n\n");
 
-  // Include memory context for better understanding of the user's knowledge patterns
   let memorySection = "";
   try {
     const memCtx = await buildMemoryContext(newContent);
     if (memCtx) {
-      memorySection = `\nUSER'S KNOWLEDGE PATTERNS (memories from past insights):\n${memCtx}\n`;
+      memorySection = `\nUSER'S KNOWLEDGE PATTERNS:\n${memCtx}\n`;
     }
   } catch {
-    // Non-critical, continue without memories
+    // Non-critical
   }
 
-  const prompt = `You are an insight deduplication assistant.
+  const prompt = `You are an insight organization assistant.
 
-A user is adding a NEW insight to their vault. Below are existing insights that are potentially similar (found via embedding search).
+A user is adding a NEW insight. Below are existing insights that may be related.
 ${memorySection}
 NEW INSIGHT:
 ${newContent}
@@ -64,42 +72,57 @@ ${newContent}
 EXISTING CANDIDATES:
 ${candidateList}
 
-Your task:
-1. Determine if the NEW insight is about the **same core idea** as any candidate.
-   - "Same core idea" means they discuss the same concept, topic, or conclusion — not just share a keyword.
-   - Complementary thoughts on the same topic COUNT as related.
-   - Merely sharing a broad category (e.g. both about "productivity") does NOT count.
-2. If a match exists, pick the BEST matching candidate.
+Decide what to do with the new insight:
+
+1. **MERGE** — The new insight says essentially the SAME thing as an existing one (duplicate or direct follow-up). The new content will be appended to the existing insight.
+2. **GROUP** — The new insight is about the SAME TOPIC as an existing one but adds a DIFFERENT perspective, angle, or piece of information. They should be grouped together for easy tracking.
+3. **NEW** — The new insight is about a different topic entirely.
+
+Guidelines:
+- "Same topic" means they discuss the same subject area or theme (e.g., two thoughts about morning routines, two observations about team communication)
+- Broad categories like "productivity" or "life" do NOT count — topics should be specific
+- When in doubt between MERGE and GROUP, prefer GROUP (keep both visible)
+- If grouping, generate a short topic label (2-4 words) that describes the shared topic
 
 Respond with ONLY valid JSON (no markdown fences):
 {
-  "matchIndex": <1-based index of best match, or null if none truly match>,
-  "reason": "<one sentence explaining why they match or why none match>"
+  "action": "merge" | "group" | "new",
+  "matchIndex": <1-based index of best match, or null if "new">,
+  "reason": "<one sentence explanation>",
+  "topicLabel": "<short 2-4 word topic label>"
 }`;
 
   try {
     const result = await model.generateContent(prompt);
     const text = result.response.text().trim();
-
-    // Strip potential markdown fences
     const cleaned = text.replace(/^```(?:json)?\s*/, "").replace(/\s*```$/, "");
     const parsed = JSON.parse(cleaned);
 
+    const action = parsed.action as "merge" | "group" | "new";
     const idx = parsed.matchIndex;
-    if (idx == null || idx < 1 || idx > candidates.length) {
-      return { matchId: null, reason: parsed.reason ?? "", mergedTags: [] };
+    const topicLabel = parsed.topicLabel || "";
+
+    if (action === "new" || idx == null || idx < 1 || idx > candidates.length) {
+      return {
+        action: "new",
+        matchId: null,
+        reason: parsed.reason ?? "",
+        topicId: null,
+        topicLabel,
+      };
     }
 
     const matched = candidates[idx - 1];
-    // Deduplicate tags from both the new insight's AI tags and the matched insight's tags
-    // (new insight tags will be merged by the caller)
+
     return {
+      action,
       matchId: matched.id,
       reason: parsed.reason ?? "Related ideas detected",
-      mergedTags: [...new Set([...matched.tags])],
+      topicId: matched.topicId ?? null,
+      topicLabel: matched.topicLabel || topicLabel,
     };
   } catch (err) {
     console.warn("[InsightVault] LLM similarity check failed:", err);
-    return { matchId: null, reason: "", mergedTags: [] };
+    return { action: "new", matchId: null, reason: "", topicId: null, topicLabel: "" };
   }
 }

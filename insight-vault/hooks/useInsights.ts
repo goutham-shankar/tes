@@ -9,6 +9,7 @@ import { db, type InsightType } from "@/db/schema";
 import {
   addInsight,
   mergeInsight,
+  assignTopic,
   deleteInsight,
   updateInsight,
   toggleFavorite,
@@ -39,7 +40,13 @@ export function useInsights() {
       content: string,
       type: InsightType,
       source?: string
-    ): Promise<{ insight: unknown; wasThreaded: boolean; mergeReason?: string }> => {
+    ): Promise<{
+      insight: unknown;
+      wasThreaded: boolean;
+      wasGrouped: boolean;
+      mergeReason?: string;
+      topicLabel?: string;
+    }> => {
       setError(null);
       setSaving(true);
       try {
@@ -61,58 +68,71 @@ export function useInsights() {
             console.warn("[InsightVault] Embedding generation failed:", embResult.reason);
           }
 
-          // Smart merge: embedding pre-filter → LLM verification
+          // Smart organization: embedding pre-filter → LLM 3-way decision
           if (embedding.length > 0) {
             try {
               const existing = await getAllInsightsWithEmbeddings();
-              // Lower threshold to catch more candidates; LLM will verify
               const candidates = topKSearch(embedding, existing, 5, 0.55);
 
               if (candidates.length > 0) {
-                const similarity = await checkSimilarity(
+                const result = await checkSimilarity(
                   content,
                   candidates.map((c) => ({
                     id: c.id,
                     content: c.content,
                     tags: c.tags,
+                    topicId: c.topicId,
+                    topicLabel: c.topicLabel,
                   }))
                 );
 
-                if (similarity.matchId) {
-                  const matchedCandidate = candidates.find(
-                    (c) => c.id === similarity.matchId
-                  );
-                  const merged = await mergeInsight(
-                    similarity.matchId,
-                    content,
-                    aiTags
-                  );
-                  // Extract memories in background (don't block UI)
-                  extractMemories(
-                    content,
-                    similarity.matchId,
-                    matchedCandidate?.content,
-                    similarity.matchId
-                  ).catch(() => {});
+                if (result.action === "merge" && result.matchId) {
+                  // Same idea → thread into existing insight
+                  const merged = await mergeInsight(result.matchId, content, aiTags);
+                  extractMemories(content, result.matchId, candidates.find((c) => c.id === result.matchId)?.content, result.matchId).catch(() => {});
                   return {
                     insight: merged,
                     wasThreaded: true,
-                    mergeReason: similarity.reason,
+                    wasGrouped: false,
+                    mergeReason: result.reason,
+                  };
+                }
+
+                if (result.action === "group" && result.matchId) {
+                  // Same topic → save as separate insight with shared topicId
+                  const topicId = result.topicId || crypto.randomUUID();
+                  const topicLabel = result.topicLabel;
+
+                  const insight = await addInsight(
+                    content, type, aiTags, embedding, source, topicId, topicLabel
+                  );
+
+                  // If the matched insight doesn't have a topicId yet, assign it
+                  if (!result.topicId) {
+                    assignTopic(result.matchId, topicId, topicLabel).catch(() => {});
+                  }
+
+                  extractMemories(content, insight.id).catch(() => {});
+                  return {
+                    insight,
+                    wasThreaded: false,
+                    wasGrouped: true,
+                    topicLabel,
+                    mergeReason: result.reason,
                   };
                 }
               }
             } catch (err) {
-              console.warn("[InsightVault] Smart merge check failed:", err);
+              console.warn("[InsightVault] Smart organization failed:", err);
             }
           }
         }
 
         const insight = await addInsight(content, type, aiTags, embedding, source);
-        // Extract memories in background
         if (isGeminiReady()) {
           extractMemories(content, insight.id).catch(() => {});
         }
-        return { insight, wasThreaded: false };
+        return { insight, wasThreaded: false, wasGrouped: false };
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
         setError(msg);

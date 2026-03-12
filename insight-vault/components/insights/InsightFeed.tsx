@@ -4,6 +4,7 @@ import {
   Search,
   Inbox,
   Layers,
+  FolderOpen,
   SlidersHorizontal,
   X,
   Star,
@@ -14,7 +15,6 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { InsightCard } from "./InsightCard";
 import { type Insight, type InsightType } from "@/db/schema";
-import { clusterInsights, clusterByTags } from "@/lib/vector";
 import { cn } from "@/lib/utils";
 
 type SortOption = "newest" | "oldest" | "favorites";
@@ -90,12 +90,60 @@ export function InsightFeed({ insights, onDelete, onEdit, onToggleFavorite, filt
     return result;
   }, [insights, query, filterTag, typeFilter, sortBy, favoritesOnly, dateFrom, dateTo]);
 
-  // Group semantically related insights
-  const clusters = useMemo(() => {
-    const hasEmbeddings = filtered.some((i) => i.embedding && i.embedding.length > 0);
-    return hasEmbeddings
-      ? clusterInsights(filtered, 0.72)
-      : clusterByTags(filtered, 1);
+  // Group by topicId — insights sharing a topic appear together
+  const topicGroups = useMemo(() => {
+    const groups: { topicId: string | null; topicLabel: string; insights: Insight[] }[] = [];
+    const topicMap = new Map<string, { topicLabel: string; insights: Insight[] }>();
+    const ungrouped: Insight[] = [];
+
+    for (const insight of filtered) {
+      if (insight.topicId) {
+        const existing = topicMap.get(insight.topicId);
+        if (existing) {
+          existing.insights.push(insight);
+        } else {
+          topicMap.set(insight.topicId, {
+            topicLabel: insight.topicLabel || "Related Insights",
+            insights: [insight],
+          });
+        }
+      } else {
+        ungrouped.push(insight);
+      }
+    }
+
+    // Add topic groups (with 2+ insights first, then singles)
+    const multiGroups: typeof groups = [];
+    const singleGroups: typeof groups = [];
+    for (const [topicId, group] of topicMap) {
+      const entry = { topicId, topicLabel: group.topicLabel, insights: group.insights };
+      if (group.insights.length > 1) {
+        multiGroups.push(entry);
+      } else {
+        singleGroups.push(entry);
+      }
+    }
+
+    // Sort multi-groups by most recent activity
+    multiGroups.sort((a, b) => {
+      const aLatest = Math.max(...a.insights.map((i) => new Date(i.updatedAt).getTime()));
+      const bLatest = Math.max(...b.insights.map((i) => new Date(i.updatedAt).getTime()));
+      return bLatest - aLatest;
+    });
+
+    groups.push(...multiGroups);
+
+    // Add single-topic and ungrouped insights as individual entries
+    const singles = [
+      ...singleGroups.map((g) => g.insights[0]),
+      ...ungrouped,
+    ];
+    // Keep the sort order for singles
+    for (const insight of singles) {
+      groups.push({ topicId: null, topicLabel: "", insights: [insight] });
+    }
+
+    return groups;
   }, [filtered]);
 
   function clearFilters() {
@@ -250,24 +298,26 @@ export function InsightFeed({ insights, onDelete, onEdit, onToggleFavorite, filt
         </div>
       ) : (
         <div className="flex flex-col gap-6">
-          {clusters.map((cluster, ci) =>
-            cluster.length === 1 ? (
-              <div key={cluster[0].id} className="grid gap-4 grid-cols-1 xl:grid-cols-2">
-                <InsightCard
-                  insight={cluster[0]}
-                  onDelete={onDelete}
-                  onEdit={onEdit}
-                  onToggleFavorite={onToggleFavorite}
-                />
-              </div>
+          {topicGroups.map((group, gi) =>
+            group.insights.length === 1 ? (
+              <InsightCard
+                key={group.insights[0].id}
+                insight={group.insights[0]}
+                onDelete={onDelete}
+                onEdit={onEdit}
+                onToggleFavorite={onToggleFavorite}
+              />
             ) : (
-              <div key={ci} className="rounded-xl border border-primary/20 bg-primary/5 p-4 space-y-3">
-                <div className="flex items-center gap-2 text-xs text-primary font-medium">
-                  <Layers className="w-3.5 h-3.5" />
-                  {cluster.length} related insights
+              <div key={group.topicId ?? gi} className="rounded-xl border border-primary/20 bg-primary/5 p-4 space-y-3">
+                <div className="flex items-center gap-2 text-sm font-medium">
+                  <FolderOpen className="w-4 h-4 text-primary" />
+                  <span className="text-primary">{group.topicLabel}</span>
+                  <span className="text-xs text-muted-foreground ml-1">
+                    {group.insights.length} insights
+                  </span>
                 </div>
                 <div className="grid gap-3 grid-cols-1 xl:grid-cols-2">
-                  {cluster.map((insight) => (
+                  {group.insights.map((insight) => (
                     <InsightCard
                       key={insight.id}
                       insight={insight}
